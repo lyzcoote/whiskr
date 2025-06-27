@@ -18,8 +18,11 @@
     } from 'flowbite-svelte';
 
     import '../app.css';
+	import type { LayoutServerLoad } from './$types';
 
-    let { children } = $props();
+	import { type LayoutProps } from "./$types";
+  let { data, children }: LayoutProps = $props();
+
 </script>
 
 <svelte:head>
@@ -48,16 +51,29 @@
             <NavHamburger />
         </div>
         <Dropdown placement="bottom" triggeredBy="#avatar-menu">
+            {#if data.user.username}
             <DropdownHeader>
-                <span class="block text-sm">Cool user</span>
-                <span class="block truncate text-sm font-medium">protogen@whiskr.uwu</span>
+                <span class="block text-sm">{data.user.name + "" + data.user.surname}</span>
+                <span class="block truncate text-sm font-medium">{data.user.email}</span>
             </DropdownHeader>
             <DropdownGroup>
                 <DropdownItem>Home</DropdownItem>
                 <DropdownItem>Settings</DropdownItem>
-				<DropdownItem href="/register">Register</DropdownItem>
+				<DropdownItem href="/logout">Logout</DropdownItem>
             </DropdownGroup>
-            <DropdownHeader>Sign out</DropdownHeader>
+			<DropdownGroup>
+				<DropdownItem href="/profile">Profile</DropdownItem>
+			</DropdownGroup>
+			{:else}
+			<DropdownHeader>
+				<span class="block text-sm">Welcome Guest</span>
+				<span class="block truncate text-sm font-medium">Please login</span>
+			</DropdownHeader>
+			<DropdownGroup>
+				<DropdownItem href="/login">Login</DropdownItem>
+				<DropdownItem href="/register">Register</DropdownItem>
+			</DropdownGroup>
+			{/if}
         </Dropdown>
         <NavUl>
             <NavLi href="/">Home</NavLi>
