@@ -3,6 +3,15 @@ import * as auth from '$lib/server/auth';
 import type { Handle } from '@sveltejs/kit';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 
+const reqHelper: Handle = ({ event, resolve }) => {
+	console.log('=> Request URL:', event.request.url);
+	console.log('=> Request Method:', event.request.method);
+	console.log('=> Request Headers:', event.request.headers);
+	console.log('=> Request Body:', event.request.body);
+
+	return resolve(event);
+};
+
 const handleParaglide: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request, locale }) => {
 		event.request = request;
@@ -34,4 +43,4 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle: Handle = sequence(handleParaglide, handleAuth);
+export const handle: Handle = sequence(reqHelper, handleParaglide, handleAuth);
