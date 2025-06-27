@@ -6,7 +6,7 @@
   let userName = $state("");
 </script>
 
-<div class="min-h-screen flex items-center justify-center bg-gray-50">
+<div class="flex items-center justify-center bg-gray-50">
   <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4">
     <!-- Welcome Label -->
     <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">
