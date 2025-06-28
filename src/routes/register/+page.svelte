@@ -16,7 +16,7 @@
 
         <form method="post" action="?/register" use:enhance class="space-y-4">
             <div>
-                <Label for="name" class="mb-2">Full Name</Label>
+                <Label for="name" class="mb-2">Name</Label>
                 <Input
                     id="name"
                     name="name"

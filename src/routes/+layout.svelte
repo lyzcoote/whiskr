@@ -18,9 +18,11 @@
     } from 'flowbite-svelte';
 
     import '../app.css';
-	import type { LayoutServerLoad } from './$types';
-
 	import { type LayoutProps } from "./$types";
+	import { dev } from '$app/environment';
+	import { injectAnalytics } from '@vercel/analytics/sveltekit';
+ 
+	injectAnalytics({ mode: dev ? 'development' : 'production' });
   let { data, children }: LayoutProps = $props();
 
 </script>
