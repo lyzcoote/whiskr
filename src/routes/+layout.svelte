@@ -22,8 +22,12 @@
 	import { dev } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
+	import { injectSpeedInsights } from '@vercel/speed-insights/sveltekit';
 
+	// Vercel Analytics and Speed Insights
+	injectSpeedInsights();
 	injectAnalytics({ mode: dev ? 'development' : 'production' });
+
 	let { data, children }: LayoutProps = $props();
 
 	function handleLogout() {
@@ -66,7 +70,16 @@
 				<DropdownGroup>
 					<DropdownItem>Home</DropdownItem>
 					<DropdownItem>Settings</DropdownItem>
-					<DropdownItem onclick={handleLogout}>Logout</DropdownItem>
+					<DropdownItem
+						role="button"
+						tabindex={0}
+						onclick={handleLogout}
+						onkeydown={(event: KeyboardEvent) => {
+							if (event.key === 'Enter') handleLogout();
+						}}
+					>
+						Logout
+					</DropdownItem>
 				</DropdownGroup>
 				<DropdownGroup>
 					<DropdownItem href="/profile">Profile</DropdownItem>
