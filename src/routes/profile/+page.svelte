@@ -1,10 +1,15 @@
 <script lang="ts">
     import { enhance } from '$app/forms';
+    import { goto } from '$app/navigation';
     import { Card, Avatar, Button, Badge, Heading, P } from 'flowbite-svelte';
     import { UserSolid, UserRemoveOutline } from 'flowbite-svelte-icons';
     import type { PageServerData } from './$types';
 
     let { data }: { data: PageServerData } = $props();
+
+    function handleLogout() {
+        goto('/logout');
+    }
 </script>
 
 <div class="max-w-2xl mx-auto p-6">
@@ -25,13 +30,11 @@
             <P class="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 Welcome to your profile page
             </P>
-            
-            <form method="post" action="?/logout" use:enhance>
-                <Button type="submit" color="red" class="flex items-center gap-2">
-                    <UserRemoveOutline class="w-4 h-4" />
-                    Sign out
-                </Button>
-            </form>
+
+            <Button onclick={handleLogout} color="alternative" class="flex items-center gap-2">
+                <UserRemoveOutline class="w-4 h-4" />
+                Sign out
+            </Button>
         </div>
     </Card>
 </div>
