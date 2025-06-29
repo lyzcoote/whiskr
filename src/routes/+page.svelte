@@ -8,12 +8,10 @@
 
 <div class="flex items-center justify-center bg-gray-50">
   <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4">
-    <!-- Welcome Label -->
     <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">
       {m.hello_world({ name: userName || 'Guest' })}
     </h1>
     
-    <!-- Name Input -->
     <div class="mb-6">
       <Label for="name" class="block mb-2 text-sm font-medium">
         Name
@@ -27,7 +25,6 @@
         />
     </div>
     
-    <!-- Language Buttons -->
     <div class="flex gap-3 justify-center">
         <Button
             onclick={() => setLocale('en')}

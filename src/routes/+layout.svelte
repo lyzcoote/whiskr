@@ -20,15 +20,29 @@
 	import '../app.css';
 	import { type LayoutProps } from './$types';
 	import { dev } from '$app/environment';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
+	import { injectSpeedInsights } from '@vercel/speed-insights/sveltekit';
+	import { UserSolid } from 'flowbite-svelte-icons';
 
+	// Vercel Analytics and Speed Insights
+	injectSpeedInsights();
 	injectAnalytics({ mode: dev ? 'development' : 'production' });
+
 	let { data, children }: LayoutProps = $props();
 
-	function handleLogout() {
-		goto('/logout');
-	}
+	let user = $derived(data?.user || null);
+	let isLoggedIn = $derived(!!user);
+
+	$effect(() => {
+		if (isLoggedIn) {
+			console.log('User logged in:');
+			$inspect(user);
+		} else {
+			console.log('No user logged in');
+		}
+	});
 </script>
 
 <svelte:head>
@@ -48,45 +62,66 @@
 			<span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white">Whiskr</span
 			>
 		</NavBrand>
-		<div class="flex items-center md:order-2">
-			<Avatar
-				id="avatar-menu"
-				src="https://api.dicebear.com/9.x/lorelei/svg"
-				class="w-8 h-8 me-3 cursor-pointer"
-				alt="User avatar"
-			/>
-			<NavHamburger />
-		</div>
-		<Dropdown placement="bottom" triggeredBy="#avatar-menu">
-			{#if data.user.username}
-				<DropdownHeader>
-					<span class="block text-sm">{data.user.name + '' + data.user.surname}</span>
-					<span class="block truncate text-sm font-medium">{data.user.email}</span>
-				</DropdownHeader>
-				<DropdownGroup>
-					<DropdownItem>Home</DropdownItem>
-					<DropdownItem>Settings</DropdownItem>
-					<DropdownItem onclick={handleLogout}>Logout</DropdownItem>
-				</DropdownGroup>
-				<DropdownGroup>
-					<DropdownItem href="/profile">Profile</DropdownItem>
-				</DropdownGroup>
-			{:else}
-				<DropdownHeader>
-					<span class="block text-sm">Welcome Guest</span>
-					<span class="block truncate text-sm font-medium">Please login</span>
-				</DropdownHeader>
-				<DropdownGroup>
-					<DropdownItem href="/login">Login</DropdownItem>
-					<DropdownItem href="/register">Register</DropdownItem>
-				</DropdownGroup>
-			{/if}
-		</Dropdown>
+
+		{#key isLoggedIn}
+			<div class="flex items-center md:order-2">
+				{#if isLoggedIn}
+					<Avatar
+						id="avatar-menu"
+						src="https://api.dicebear.com/9.x/lorelei/svg"
+						class="w-8 h-8 me-3 cursor-pointer"
+						alt="User avatar"
+					/>
+				{:else}
+					<div
+						id="avatar-menu"
+						class="w-8 h-8 me-3 cursor-pointer flex items-center justify-center bg-gray-200 rounded-full"
+					>
+						<UserSolid class="w-5 h-5 text-gray-600" />
+					</div>
+				{/if}
+				<NavHamburger />
+			</div>
+			<Dropdown placement="bottom" triggeredBy="#avatar-menu">
+				{#if isLoggedIn && user}
+					<DropdownHeader>
+						<span class="block text-sm">{user.name || ''}</span>
+						<span class="block truncate text-sm font-medium">{user.email || ''}</span>
+					</DropdownHeader>
+					<DropdownGroup>
+						<DropdownItem href="/">Home</DropdownItem>
+						<DropdownItem>Settings</DropdownItem>
+						<form method="POST" action="/logout" use:enhance>
+							<button
+								type="submit"
+								class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+							>
+								Logout
+							</button>
+						</form>
+					</DropdownGroup>
+					<DropdownGroup>
+						<DropdownItem href="/profile">Profile</DropdownItem>
+					</DropdownGroup>
+				{:else}
+					<DropdownHeader>
+						<span class="block text-sm">Welcome Guest</span>
+						<span class="block truncate text-sm font-medium">Please login</span>
+					</DropdownHeader>
+					<DropdownGroup>
+						<DropdownItem href="/login">Login</DropdownItem>
+						<DropdownItem href="/register">Register</DropdownItem>
+					</DropdownGroup>
+				{/if}
+			</Dropdown>
+		{/key}
+
 		<NavUl>
 			<NavLi href="/">Home</NavLi>
 			<NavLi href="/about">About</NavLi>
 			<NavLi href="/pricing">Pricing</NavLi>
 			<NavLi href="/contact">Contact</NavLi>
+			<NavLi href="/editor">Editor</NavLi>
 		</NavUl>
 	</Navbar>
 
