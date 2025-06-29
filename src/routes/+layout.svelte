@@ -121,6 +121,7 @@
 			<NavLi href="/about">About</NavLi>
 			<NavLi href="/pricing">Pricing</NavLi>
 			<NavLi href="/contact">Contact</NavLi>
+			<NavLi href="/editor">Editor</NavLi>
 		</NavUl>
 	</Navbar>
 
