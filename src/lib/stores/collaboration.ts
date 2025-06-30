@@ -44,12 +44,13 @@ function createCollaborationStore() {
 
                 // Create new YJS document and provider
                 const ydoc = new Y.Doc();
-                const provider = new WebsocketProvider('ws://localhost:1234', roomId, ydoc);
+                const provider = new WebsocketProvider('ws://ws.whiskr.it', roomId, ydoc);
                 const ytext = ydoc.getText('content');
 
                 // Handle connection status
                 provider.on('status', (event: any) => {
                     update(s => ({ ...s, isConnected: event.status === 'connected' }));
+                    console.log('🔗 WebSocket status:', event.status);
                 });
 
                 // Handle awareness (user presence)
@@ -83,6 +84,8 @@ function createCollaborationStore() {
                     });
                 }
 
+                console.log('🤝 Connecting to collaboration room:', roomId, 'at ws://ws.whiskr.it');
+
                 return {
                     ...state,
                     roomId,
@@ -98,6 +101,7 @@ function createCollaborationStore() {
             update(state => {
                 if (state.provider) {
                     state.provider.destroy();
+                    console.log('🔌 Disconnected from collaboration');
                 }
                 if (state.ydoc) {
                     state.ydoc.destroy();
