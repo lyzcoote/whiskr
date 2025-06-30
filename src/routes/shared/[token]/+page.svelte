@@ -275,7 +275,7 @@
     {:else if !isEditing}
         <Alert color="green" class="mt-6">
             <span class="font-medium">Collaborative document:</span>
-            This document allows editing. Click "Edit Mode" to start collaborating in real-time with others.
+            This document allows editing. Click "Edit Mode\" to start collaborating in real-time with others.
         </Alert>
     {/if}
 </div>
