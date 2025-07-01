@@ -6,7 +6,9 @@ export interface TempNote {
     content: string;
     createdAt: Date;
     updatedAt: Date;
-    isCollaborative: boolean; // Nuovo campo
+    isCollaborative: boolean;
+    shareToken?: string; // Nuovo campo opzionale
+    allowGuestEdit?: boolean; // Nuovo campo opzionale
 }
 
 const STORAGE_KEY = 'whiskr_temp_notes';
@@ -74,12 +76,14 @@ class LocalStorageDB {
             id: crypto.randomUUID(),
             title: note.title,
             content: note.content,
-            isCollaborative: note.isCollaborative ?? false, // Default: non collaborativa
+            isCollaborative: note.isCollaborative ?? false,
+            shareToken: note.shareToken,
+            allowGuestEdit: note.allowGuestEdit ?? false,
             createdAt: now,
             updatedAt: now
         };
         
-        notes.unshift(newNote); // Aggiungi all'inizio
+        notes.unshift(newNote);
         this.setStorage(notes);
         return newNote;
     }

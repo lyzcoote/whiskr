@@ -54,6 +54,14 @@
     "marked": "^16.0.0",
     "mysql2": "^3.14.1",
     "y-websocket": "^3.0.0",
-    "yjs": "^13.6.27"
-  }
+    "yjs": "^13.6.27",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "uuid": "^10.0.0"
+  },
+  "trustedDependencies": [
+    "@tailwindcss/oxide",
+    "@vercel/speed-insights",
+    "core-js"
+  ]
 }

@@ -7,7 +7,9 @@
         Input,
         Toast,
         Checkbox,
-        Label
+        Label,
+        Dropdown,
+        DropdownItem
     } from 'flowbite-svelte';
     import {
         LetterBoldOutline,
@@ -18,21 +20,23 @@
         EditOutline,
         FloppyDiskOutline,
         TrashBinOutline,
-        UsersGroupOutline
+        UsersGroupOutline,
+        ShareAllOutline,
+        DownloadOutline,
+        ChevronDownOutline
     } from 'flowbite-svelte-icons';
     import NotesSidebar from '$lib/components/NoteSidebar.svelte';
-    import * as Y from 'yjs';
-    import { WebsocketProvider } from 'y-websocket';
+    import CollaborativeUsers from '$lib/components/CollaborativeUsers.svelte';
+    import ShareModal from '$lib/components/ShareModal.svelte';
+    import ExportModal from '$lib/components/ExportModal.svelte';
     import { marked } from 'marked';
     import { notesStore } from '$lib/stores/note';
+    import { collaborationStore, type CollaborationState } from '$lib/stores/collaboration';
     import { type TempNote } from '$lib/stores/localStorage';
 
     let editorContainer = $state<HTMLDivElement>();
     let previewContainer = $state<HTMLDivElement | undefined>();
     let resizeHandle = $state<HTMLDivElement>();
-    let ydoc: Y.Doc;
-    let provider: WebsocketProvider | null;
-    let ytext: Y.Text;
     let markdownContent = $state('');
     let htmlPreview = $state('');
     let documentTitle = $state('Untitled Document');
@@ -44,10 +48,26 @@
     let saveStatus = $state<'saved' | 'saving' | 'unsaved'>('unsaved');
     let autoSaveTimeout: NodeJS.Timeout;
     let isCollaborative = $state(false);
+    let shareToken = $state<string | null>(null);
+    let allowGuestEdit = $state(false);
+
+    // Modal states
+    let showShareModal = $state(false);
+    let showExportModal = $state(false);
 
     // Resize state
     let editorWidth = $state(50);
     let isResizing = $state(false);
+
+    // Collaboration state
+    let collaborationState: CollaborationState = $state({
+        isConnected: false,
+        users: [],
+        roomId: null,
+        provider: null,
+        ydoc: null,
+        ytext: null
+    });
 
     // Flags to prevent infinite loops
     let isUpdatingFromYJS = $state(false);
@@ -62,93 +82,38 @@
     onMount(async () => {
         // Initialize the notes store
         notesStore.init();
-        initializeYJS();
         await updatePreview();
+        
+        // Subscribe to collaboration store
+        collaborationStore.subscribe(state => {
+            collaborationState = state;
+            
+            // Handle YJS text changes
+            if (state.ytext && !isUpdatingFromYJS) {
+                state.ytext.observe(async (event, transaction) => {
+                    if (transaction.local || isUpdatingYJS) return;
+                    
+                    const newContent = state.ytext!.toString();
+                    if (newContent !== markdownContent) {
+                        isUpdatingFromYJS = true;
+                        markdownContent = newContent;
+                        await updatePreview();
+                        scheduleAutoSave();
+                        
+                        setTimeout(() => {
+                            isUpdatingFromYJS = false;
+                        }, 0);
+                    }
+                });
+            }
+        });
     });
 
     onDestroy(() => {
         if (autoSaveTimeout) {
             clearTimeout(autoSaveTimeout);
         }
-        if (provider) {
-            provider.destroy();
-        }
-        if (ydoc) {
-            ydoc.destroy();
-        }
-    });
-
-    function initializeYJS() {
-        // Destroy existing connection if present
-        if (provider) {
-            provider.destroy();
-            provider = null;
-        }
-        if (ydoc) {
-            ydoc.destroy();
-        }
-
-        // Initialize YJS only if the note is collaborative
-        if (isCollaborative) {
-            ydoc = new Y.Doc();
-
-            // Use the note ID as room name for collaboration
-            const roomName = currentNoteId || 'temp-' + Date.now();
-            provider = new WebsocketProvider('ws://localhost:1234', roomName, ydoc);
-
-            ytext = ydoc.getText('content');
-
-            // Listener for YJS changes - PREVENT LOOPS
-            ytext.observe(async (event, transaction) => {
-                // Ignore if the change comes from this instance
-                if (transaction.local || isUpdatingYJS) return;
-
-                const newContent = ytext.toString();
-                if (newContent !== markdownContent && !isUpdatingFromYJS) {
-                    isUpdatingFromYJS = true;
-                    markdownContent = newContent;
-                    await updatePreview();
-                    scheduleAutoSave();
-
-                    // Reset flag after a tick
-                    setTimeout(() => {
-                        isUpdatingFromYJS = false;
-                    }, 0);
-                }
-            });
-
-            // Synchronize current content ONLY if YJS is empty
-            provider.on('status', (event: any) => {
-                if (event.status === 'connected') {
-                    // Wait a moment for initial synchronization
-                    setTimeout(() => {
-                        if (ytext.length === 0 && markdownContent.trim()) {
-                            isUpdatingYJS = true;
-                            ytext.insert(0, markdownContent);
-                            setTimeout(() => {
-                                isUpdatingYJS = false;
-                            }, 100);
-                        } else if (ytext.length > 0 && !isUpdatingFromYJS) {
-                            isUpdatingFromYJS = true;
-                            markdownContent = ytext.toString();
-                            updatePreview();
-                            setTimeout(() => {
-                                isUpdatingFromYJS = false;
-                            }, 0);
-                        }
-                    }, 100);
-                }
-            });
-
-            console.log('🤝 Collaborative mode enabled for room:', roomName);
-        } else {
-            console.log('✏️ Solo editing mode');
-        }
-    }
-
-    // Watcher for when isCollaborative changes
-    $effect(() => {
-        initializeYJS();
+        collaborationStore.disconnect();
     });
 
     async function updatePreview() {
@@ -161,7 +126,6 @@
     }
 
     async function handleInput(event: Event) {
-        // Prevent loop if we're updating from YJS
         if (isUpdatingFromYJS) return;
 
         const target = event.target as HTMLTextAreaElement;
@@ -171,17 +135,18 @@
         await updatePreview();
         scheduleAutoSave();
 
+        // Update cursor position for collaboration
+        collaborationStore.updateCursor(target.selectionStart);
+
         // If collaborative, synchronize with YJS
-        if (isCollaborative && ytext && !isUpdatingYJS) {
+        if (isCollaborative && collaborationState.ytext && !isUpdatingYJS) {
             isUpdatingYJS = true;
 
-            // Calculate differences instead of replacing everything
-            const currentYJSContent = ytext.toString();
+            const currentYJSContent = collaborationState.ytext.toString();
             if (currentYJSContent !== newContent) {
-                // More efficient method: use YJS transactions
-                ydoc.transact(() => {
-                    ytext.delete(0, ytext.length);
-                    ytext.insert(0, newContent);
+                collaborationState.ydoc!.transact(() => {
+                    collaborationState.ytext!.delete(0, collaborationState.ytext!.length);
+                    collaborationState.ytext!.insert(0, newContent);
                 });
             }
 
@@ -192,7 +157,6 @@
     }
 
     function scheduleAutoSave() {
-        // Don't auto-save if we're syncing
         if (isUpdatingFromYJS) return;
 
         saveStatus = 'unsaved';
@@ -206,7 +170,7 @@
         }, 2000);
     }
 
-    function saveNote() {
+    async function saveNote() {
         if (!documentTitle.trim() || !markdownContent.trim()) return;
 
         saveStatus = 'saving';
@@ -222,9 +186,16 @@
             currentNoteId = savedNote.id;
             saveStatus = 'saved';
 
-            // If it just became collaborative and has an ID, reconnect YJS
-            if (isCollaborative && !provider) {
-                initializeYJS();
+            // Generate share token if collaborative and doesn't exist
+            if (isCollaborative && !shareToken) {
+                shareToken = generateShareToken();
+                // In a real app, you'd save this to the database
+            }
+
+            // Connect to collaboration if needed
+            if (isCollaborative && !collaborationState.isConnected) {
+                // In a real app, get user info from context
+                collaborationStore.connect(currentNoteId, 'user-id', 'User Name');
             }
 
             setTimeout(() => {
@@ -243,16 +214,15 @@
         documentTitle = 'Untitled Document';
         markdownContent = '# New Note\n\nStart writing...';
         isCollaborative = false;
+        shareToken = null;
+        allowGuestEdit = false;
 
         // Reset flags
         isUpdatingFromYJS = false;
         isUpdatingYJS = false;
 
-        // Reinitialize YJS if needed
-        if (provider) {
-            provider.destroy();
-            provider = null;
-        }
+        // Disconnect from collaboration
+        collaborationStore.disconnect();
 
         updatePreview();
     }
@@ -266,6 +236,14 @@
         documentTitle = note.title;
         markdownContent = note.content;
         isCollaborative = note.isCollaborative || false;
+
+        // Disconnect from previous collaboration
+        collaborationStore.disconnect();
+
+        // Connect to collaboration if needed
+        if (isCollaborative) {
+            collaborationStore.connect(note.id, 'user-id', 'User Name');
+        }
 
         updatePreview();
         saveStatus = 'saved';
@@ -294,11 +272,11 @@
         await updatePreview();
 
         // Update YJS if collaborative
-        if (isCollaborative && ytext && !isUpdatingYJS) {
+        if (isCollaborative && collaborationState.ytext && !isUpdatingYJS) {
             isUpdatingYJS = true;
-            ydoc.transact(() => {
-                ytext.delete(0, ytext.length);
-                ytext.insert(0, newContent);
+            collaborationState.ydoc!.transact(() => {
+                collaborationState.ytext!.delete(0, collaborationState.ytext!.length);
+                collaborationState.ytext!.insert(0, newContent);
             });
             setTimeout(() => {
                 isUpdatingYJS = false;
@@ -319,7 +297,37 @@
         isPreviewMode = !isPreviewMode;
     }
 
-    // Resize functions remain the same
+    function generateShareToken(): string {
+        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+
+    async function updateSharePermissions(allowEdit: boolean) {
+        if (!currentNoteId) return;
+
+        try {
+            const response = await fetch('/api/notes/share', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    noteId: currentNoteId,
+                    allowGuestEdit: allowEdit
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update permissions');
+            }
+
+            allowGuestEdit = allowEdit;
+        } catch (error) {
+            console.error('Error updating permissions:', error);
+            alert('Failed to update permissions. Please try again.');
+        }
+    }
+
+    // Resize functions
     function startResize(event: MouseEvent) {
         isResizing = true;
         document.addEventListener('mousemove', handleResize);
@@ -383,12 +391,27 @@
 
                     <!-- Collaborative Checkbox -->
                     <div class="flex items-center gap-2">
-                        <Checkbox bind:checked={isCollaborative} onchange={scheduleAutoSave} />
+                        <Checkbox 
+                            bind:checked={isCollaborative} 
+                            onchange={() => {
+                                if (isCollaborative && currentNoteId) {
+                                    collaborationStore.connect(currentNoteId, 'user-id', 'User Name');
+                                } else {
+                                    collaborationStore.disconnect();
+                                }
+                                scheduleAutoSave();
+                            }}
+                        />
                         <Label class="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1">
                             <UsersGroupOutline class="w-4 h-4" />
                             Collaborative
                         </Label>
                     </div>
+
+                    <!-- Collaborative Users -->
+                    {#if isCollaborative}
+                        <CollaborativeUsers />
+                    {/if}
 
                     <!-- Save Status Indicator -->
                     <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -416,6 +439,24 @@
                             <TrashBinOutline class="w-4 h-4" />
                         </Button>
                     {/if}
+
+                    <!-- Share Button -->
+                    {#if isCollaborative && currentNoteId}
+                        <Button 
+                            size="sm" 
+                            color="blue" 
+                            onclick={() => showShareModal = true}
+                            title="Share Document"
+                        >
+                            <ShareAllOutline class="w-4 h-4" />
+                        </Button>
+                    {/if}
+
+                    <!-- Export Dropdown -->
+                    <Button size="sm" color="alternative" class="relative" onclick={() => showExportModal = true}>
+                        <DownloadOutline class="w-4 h-4 mr-1" />
+                        Export
+                    </Button>
 
                     <!-- View toggle buttons -->
                     <Button size="sm" color="alternative" onclick={togglePreview}>
@@ -509,7 +550,7 @@
         <div class="flex-1 flex overflow-hidden resize-container">
             {#if isPreviewMode}
                 <!-- Preview only -->
-                <div class="w-full h-full overflow-auto bg-white dark:bg-gray-900">
+                <div class="w-full h-full overflow-auto bg-white dark:bg-gray-900" bind:this={previewContainer}>
                     <div
                         class="prose prose-lg max-w-none dark:prose-invert p-6
                         prose-headings:text-gray-900 dark:prose-headings:text-white
@@ -576,6 +617,26 @@
         </div>
     </div>
 </div>
+
+<!-- Modals -->
+{#if showShareModal}
+        <ShareModal 
+            bind:open={showShareModal}
+            noteId={currentNoteId}
+            bind:shareToken
+            bind:allowGuestEdit
+            noteTitle={documentTitle}
+            noteContent={markdownContent}
+            onUpdatePermissions={updateSharePermissions}
+        />
+    {/if}
+
+<ExportModal 
+    bind:open={showExportModal}
+    content={markdownContent}
+    title={documentTitle}
+    previewElement={previewContainer}
+/>
 
 <style>
     .resize-container {
